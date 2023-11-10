@@ -1,0 +1,124 @@
+version: '2.2'
+services:
+  app:
+    build:
+      # Pull from ACR 
+      context: ./docker/base/
+      # context: ./ # local
+      args:
+        CONTAINER_REGISTRY: ${CONTAINER_REGISTRY}
+        REPOSITORY_NAME: ${REPOSITORY_NAME}
+        IMAGE_TAG: ${IMAGE_TAG}
+        ENVIRONMENT: DEV
+    image: kth-rdm-v12:${IMAGE_TAG}
+    restart: "unless-stopped"
+    env_file: ".env"
+    environment:
+      # TODO set on prod: redis://${CACHE_REDIS_USER}:${CACHE_REDIS_PASSWORD}@cache:6379/1
+      - "INVENIO_ACCOUNTS_SESSION_REDIS_URL=redis://cache:6379/1"
+      - "INVENIO_CELERY_BROKER_URL=amqp://${INVENIO_RABBITMQ_USER}:${INVENIO_RABBITMQ_PASSWORD}@mq:5672/"
+      - "INVENIO_BROKER_URL=amqp://${INVENIO_RABBITMQ_USER}:${INVENIO_RABBITMQ_PASSWORD}@mq:5672/"
+      - "INVENIO_CACHE_TYPE=redis"
+      - "INVENIO_CACHE_REDIS_URL=redis://cache:6379/0"
+      - "INVENIO_CELERY_RESULT_BACKEND=redis://cache:6379/2"
+      - "INVENIO_COMMUNITIES_IDENTITIES_CACHE_REDIS_URL=redis://cache:6379/4"
+      - "INVENIO_SEARCH_HOSTS=['search:9200']"
+      - "INVENIO_SECRET_KEY=${SECRET_KEY}"
+      - "INVENIO_SQLALCHEMY_DATABASE_URI=${DB_ENGINE}://${INVENIO_DATABASE_ROOT_USER}:${INVENIO_DATABASE_ROOT_PASSWORD}@${DB_HOST}:${DB_PORT}/${INVENIO_DATABASE_DB}"
+      - "INVENIO_WSGI_PROXIES=2"
+      - "INVENIO_RATELIMIT_STORAGE_URL=redis://cache:6379/3"
+  frontend:
+    build: ./docker/nginx/
+    image: kth-rdm-v12-frontend
+    restart: "unless-stopped"
+    ports:
+      - "80"
+      - "443"
+  cache:
+    env_file: ".env"
+    image: redis:7
+    build:
+      context: ./docker/redis/
+    restart: "unless-stopped"
+    user: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - cache-data:/data
+  db:
+    env_file: ".env"
+    build:
+      context: ./docker/postgres/
+    restart: "unless-stopped"
+    environment:
+      - "POSTGRES_USER=${INVENIO_DATABASE_ROOT_USER}"
+      - "POSTGRES_PASSWORD=${INVENIO_DATABASE_ROOT_PASSWORD}"
+      - "POSTGRES_DB=${INVENIO_DATABASE_DB}"
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+  pgadmin:
+    env_file: ".env"
+    image: dpage/pgadmin4:6
+    restart: "unless-stopped"
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: "${PGADMIN_DEFAULT_EMAIL}"
+      PGADMIN_DEFAULT_PASSWORD: "${PGADMIN_DEFAULT_PASSWORD}"
+    volumes:
+      - ./docker/pgadmin/servers.json:/pgadmin4/servers.json
+  mq:
+    env_file: ".env"
+    build:
+      context: ./docker/rabbitmq/
+    restart: "unless-stopped"
+    environment:
+      - "RABBITMQ_DEFAULT_USER=${INVENIO_RABBITMQ_USER}"
+      - "RABBITMQ_DEFAULT_PASS=${INVENIO_RABBITMQ_PASSWORD}"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    ports:
+      - "15672:15672"
+      - "5672:5672"
+  search:
+    env_file: ".env"
+    image: opensearchproject/opensearch:2.3.0
+    restart: "unless-stopped"
+    environment:
+      # settings only for development. DO NOT use in production!
+      - bootstrap.memory_lock=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+      - "DISABLE_INSTALL_DEMO_CONFIG=true"
+      - "DISABLE_SECURITY_PLUGIN=true"
+      - "discovery.type=single-node"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    mem_limit: 2g
+    ports:
+      - "9200:9200"
+      - "9600:9600"
+    volumes:
+      - search-data:/usr/share/opensearch/data
+  opensearch-dashboards:
+    env_file: ".env"
+    image: opensearchproject/opensearch-dashboards:2.3.0
+    ports:
+      - "5601:5601"
+    expose:
+      - "5601"
+    environment:
+      # settings only for development. DO NOT use in production!
+      - 'OPENSEARCH_HOSTS=["http://search:9200"]'
+      - "DISABLE_SECURITY_DASHBOARDS_PLUGIN=false"
+volumes:
+  search-data:
+  rabbitmq-data:
+  db-data:
+  cache-data:
