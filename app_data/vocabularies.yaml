@@ -44,24 +44,4 @@ communitytypes:
 code:developmentStatus:
   pid-type: ds
   data-file: vocabularies/development_status.yaml
-# ! Adding names, funders, awards directly here will lead to errors, import using the vocabularies_future...
-# funders:
-#   pid-type: fun
-#   data-file: vocabularies/kth_funders.yaml
-# relationtypes:
-#   pid-type: rlt
-#   data-file: vocabularies/relation_types.yaml
-# awards:
-#   pid-type: awa
-#   data-file: vocabularies/kth_awards.yaml
 
-# Full pid-type list: https://github.com/inveniosoftware/invenio-rdm-records/blob/master/invenio_rdm_records/fixtures/data/vocabularies.yaml
-
-# TODO: Uncoment this if you want to have all affiliations with ROR identifiers.
-# affiliations:
-#   pid-type: aff
-#   schemes:
-#     - id: ROR
-#       name: Research Organization Registry
-#       uri: "https://ror.org/"
-#       data-file: vocabularies/affiliations_ror.yaml
